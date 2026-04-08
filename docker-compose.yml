@@ -1,0 +1,34 @@
+services:
+  ai_task_manager:
+    build:
+      context: ./my_env/server
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=sk-dummy-key-for-local-testing
+    volumes:
+      - ./my_env/server:/app
+    restart: always
+
+  openenv_server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    command: ["python", "-m", "my_env.server.app", "--port", "8001"]
+    volumes:
+      - .:/app
+    restart: always
+
+  dummy_server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8000"
+    command: ["python", "main.py"]
+    volumes:
+      - .:/app
+    restart: always
