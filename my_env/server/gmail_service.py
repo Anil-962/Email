@@ -1,9 +1,4 @@
 import os
-import json
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
 import logging
 import base64
 from email.message import EmailMessage
@@ -17,11 +12,29 @@ SCOPES = [
     'https://www.googleapis.com/auth/gmail.send'
 ]
 
+def _import_google_clients():
+    """
+    Import Gmail SDK modules on demand.
+    This keeps app startup functional even if Gmail extras are not installed.
+    """
+    try:
+        from google.auth.transport.requests import Request
+        from google.oauth2.credentials import Credentials
+        from google_auth_oauthlib.flow import InstalledAppFlow
+        from googleapiclient.discovery import build
+        return Request, Credentials, InstalledAppFlow, build
+    except ModuleNotFoundError as exc:
+        raise RuntimeError(
+            "Missing Gmail dependencies. Install with: "
+            "pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib"
+        ) from exc
+
 def get_gmail_service():
     """
     Handles the stateless token management setup using Env Vars mapping and
     returns the constructed Google API client service.
     """
+    Request, Credentials, InstalledAppFlow, build = _import_google_clients()
     creds = None
     
     # Secure paths handled via environment mappings
