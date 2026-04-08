@@ -1,0 +1,12 @@
+.git
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+my_env/.venv
+my_env/client/node_modules
+my_env/client/dist
+my_env/tasks.db
+
+_check_google.py

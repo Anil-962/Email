@@ -1,4 +1,5 @@
 import os
+import json
 import logging
 import base64
 from email.message import EmailMessage
@@ -11,6 +12,20 @@ SCOPES = [
     'https://www.googleapis.com/auth/gmail.readonly',
     'https://www.googleapis.com/auth/gmail.send'
 ]
+
+def _write_json_file_from_env(env_var_name: str, target_file: str) -> None:
+    payload = os.environ.get(env_var_name)
+    if not payload or os.path.exists(target_file):
+        return
+
+    try:
+        parsed = json.loads(payload)
+    except json.JSONDecodeError:
+        logger.warning(f"{env_var_name} is not valid JSON. Skipping file hydration.")
+        return
+
+    with open(target_file, "w", encoding="utf-8") as file:
+        json.dump(parsed, file)
 
 def _import_google_clients():
     """
@@ -40,6 +55,11 @@ def get_gmail_service():
     # Secure paths handled via environment mappings
     token_file = os.environ.get("GMAIL_TOKEN_FILE", "token.json")
     credentials_file = os.environ.get("GMAIL_CREDENTIALS_FILE", "credentials.json")
+    is_hosted_runtime = bool(os.environ.get("SPACE_ID") or os.environ.get("HF_SPACE_ID"))
+
+    # Optional hosted setup: provide JSON payloads via env vars instead of files.
+    _write_json_file_from_env("GMAIL_TOKEN_JSON", token_file)
+    _write_json_file_from_env("GMAIL_CREDENTIALS_JSON", credentials_file)
 
     # Load existing authorized user configs
     if os.path.exists(token_file):
@@ -55,6 +75,12 @@ def get_gmail_service():
                 raise ValueError(
                     f"OAuth2 Credentials file '{credentials_file}' not found. "
                     "Ensure you mapped the Google Cloud Console credentials securely."
+                )
+
+            if is_hosted_runtime:
+                raise ValueError(
+                    "Hosted runtime requires a valid Gmail token. "
+                    "Set GMAIL_TOKEN_JSON (and optionally GMAIL_CREDENTIALS_JSON) as environment secrets."
                 )
             
             # Spin up the desktop flow securely

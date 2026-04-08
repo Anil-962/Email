@@ -16,6 +16,14 @@ logger = setup_logger("api_gateway")
 
 app = FastAPI(title="AI Task Manager API (Enterprise SaaS Edition)")
 
+@app.get("/")
+def root():
+    return {
+        "status": "ok",
+        "service": "AI Task Manager API",
+        "docs": "/docs"
+    }
+
 
 @app.on_event("startup")
 def on_startup() -> None:
