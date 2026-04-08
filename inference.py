@@ -101,21 +101,40 @@ class OpenEnvInferenceClient:
 _default_client = OpenEnvInferenceClient()
 
 
-def suggest_action(context: str = "default rollout step") -> str:
+def load_model_client() -> tuple[Any | None, str | None]:
     """
-    Optional AI action generator with deterministic fallback.
-    Falls back safely if model/client/key is unavailable.
+    Load the model client safely.
+    Returns (client, error_message). Never raises.
     """
-    fallback = "hello from inference.py"
     api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("HF_TOKEN")
-    if OpenAI is None or not api_key:
-        return fallback
+    if OpenAI is None:
+        return None, "openai_sdk_unavailable"
+    if not api_key:
+        return None, "api_key_missing"
 
     try:
         client = OpenAI(
             api_key=api_key,
             base_url=os.environ.get("API_BASE_URL", "https://router.huggingface.co/v1"),
         )
+        return client, None
+    except Exception as exc:
+        return None, f"{type(exc).__name__}: {exc}"
+
+
+def suggest_action(context: str = "default rollout step", model_client: Any | None = None) -> str:
+    """
+    Optional AI action generator with deterministic fallback.
+    Falls back safely if model/client/key is unavailable.
+    """
+    fallback = "hello from inference.py"
+    client = model_client
+    if client is None:
+        client, _ = load_model_client()
+    if client is None:
+        return fallback
+
+    try:
         response = client.chat.completions.create(
             model=DEFAULT_MODEL,
             messages=[
@@ -146,15 +165,95 @@ def get_state() -> dict[str, Any]:
     return _default_client.get_state()
 
 
+def run(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    """
+    OpenEnv-compatible runner.
+
+    Expected payload format:
+    {
+      "base_url": "http://127.0.0.1:7860",   # optional
+      "timeout": 10,                          # optional
+      "context": "task context",              # optional
+      "action": "explicit action string"      # optional
+    }
+    """
+    data = payload or {}
+    base_url = str(data.get("base_url") or DEFAULT_BASE_URL).rstrip("/")
+    timeout = float(data.get("timeout") or DEFAULT_TIMEOUT)
+    context = str(data.get("context") or "default rollout step")
+    explicit_action = data.get("action")
+
+    client = OpenEnvInferenceClient(base_url=base_url, timeout=timeout)
+    model_client, model_error = load_model_client()
+
+    action = explicit_action
+    if action is None:
+        action = suggest_action(context=context, model_client=model_client)
+    if not isinstance(action, (str, dict)):
+        action = str(action)
+
+    try:
+        reset_result = client.reset()
+        step_result = client.step(action)
+        state_result = client.get_state()
+
+        results = [reset_result, step_result, state_result]
+        success = all(result.get("ok", False) for result in results)
+        error = None
+        if not success:
+            first_failure = next((result for result in results if not result.get("ok", False)), None)
+            if first_failure:
+                error = str(first_failure.get("error") or "request_failed")
+
+        return {
+            "success": success,
+            "error": error,
+            "input": {
+                "base_url": base_url,
+                "timeout": timeout,
+                "context": context,
+                "action": action,
+            },
+            "model": {
+                "loaded": model_client is not None,
+                "error": model_error,
+                "name": DEFAULT_MODEL,
+            },
+            "output": {
+                "reset": reset_result,
+                "step": step_result,
+                "state": state_result,
+            },
+        }
+    except Exception as exc:
+        return {
+            "success": False,
+            "error": f"{type(exc).__name__}: {exc}",
+            "input": {
+                "base_url": base_url,
+                "timeout": timeout,
+                "context": context,
+                "action": action,
+            },
+            "model": {
+                "loaded": model_client is not None,
+                "error": model_error,
+                "name": DEFAULT_MODEL,
+            },
+            "output": {},
+        }
+
+
+def predict(payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    """
+    Prediction entrypoint expected by many hackathon validators.
+    """
+    return run(payload)
+
+
 def main() -> None:
     """Quick smoke run against the configured backend."""
-    client = OpenEnvInferenceClient()
-    action = suggest_action("smoke test")
-    result = {
-        "reset": client.reset(),
-        "step": client.step(action),
-        "state": client.get_state(),
-    }
+    result = run({"context": "smoke test"})
     print(json.dumps(result, indent=2))
 
 

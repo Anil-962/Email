@@ -6,15 +6,15 @@ import logging
 from threading import Lock
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from pydantic import BaseModel, Field
 
 from .my_env_environment import MyEnvironment
 
 try:
-    from models import MyAction
+    from models import MyAction, MyObservation
 except ModuleNotFoundError:  # pragma: no cover
-    from my_env.models import MyAction
+    from my_env.models import MyAction, MyObservation
 
 
 app = FastAPI(title="OpenEnv-Compatible Backend")
@@ -37,6 +37,30 @@ _DEFAULT_OBSERVATION: dict[str, Any] = {
 _DEFAULT_STATE: dict[str, Any] = {
     "episode_id": "bootstrap",
     "step_count": 0,
+}
+_DEFAULT_SCHEMA: dict[str, Any] = {
+    "action": {
+        "type": "object",
+        "properties": {"message": {"type": "string"}},
+        "required": ["message"],
+    },
+    "observation": {
+        "type": "object",
+        "properties": {
+            "echoed_message": {"type": "string"},
+            "message_length": {"type": "integer"},
+            "done": {"type": "boolean"},
+            "reward": {"type": "number"},
+            "metadata": {"type": "object"},
+        },
+    },
+    "state": {
+        "type": "object",
+        "properties": {
+            "episode_id": {"type": "string"},
+            "step_count": {"type": "integer"},
+        },
+    },
 }
 
 
@@ -70,6 +94,52 @@ def _success_response(data: dict[str, Any]) -> dict[str, Any]:
 def _error_response(error_message: str, data: dict[str, Any] | None = None) -> dict[str, Any]:
     payload = data or {}
     return {"success": False, "error": error_message, "data": payload, **payload}
+
+
+@app.get("/health")
+def health() -> dict[str, Any]:
+    return {"status": "healthy"}
+
+
+@app.get("/metadata")
+def metadata() -> dict[str, Any]:
+    return {
+        "name": "my_env",
+        "description": "OpenEnv-compatible Gym-style environment API",
+    }
+
+
+@app.get("/schema")
+def schema() -> dict[str, Any]:
+    try:
+        action_schema = MyAction.model_json_schema()
+    except Exception:
+        action_schema = _DEFAULT_SCHEMA["action"]
+
+    try:
+        observation_schema = MyObservation.model_json_schema()
+    except Exception:
+        observation_schema = _DEFAULT_SCHEMA["observation"]
+
+    return {
+        "action": action_schema,
+        "observation": observation_schema,
+        "state": _DEFAULT_SCHEMA["state"],
+    }
+
+
+@app.post("/mcp")
+async def mcp(request: Request) -> dict[str, Any]:
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    request_id = body.get("id") if isinstance(body, dict) else None
+    return {
+        "jsonrpc": "2.0",
+        "id": request_id,
+        "result": {"status": "ok"},
+    }
 
 
 @app.post("/reset")
