@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyc.*
+*.pyo
+*.pyd
+
+.uv-cache/
+my_env/.venv/
+my_env/tasks.db
+
+inference_results.json
+_check_google.py

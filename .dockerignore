@@ -1,6 +1,8 @@
 .git
+.gitignore
 __pycache__
 *.pyc
+*.pyc.*
 *.pyo
 *.pyd
 
@@ -10,3 +12,5 @@ my_env/client/dist
 my_env/tasks.db
 
 _check_google.py
+inference_results.json
+.uv-cache

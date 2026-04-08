@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openenv-my_env-root"
+version = "0.1.0"
+description = "Root compatibility package for OpenEnv validation and Space deployment"
+requires-python = ">=3.10"
+dependencies = [
+    "openenv-core[core]>=0.2.2",
+    "pydantic>=2.0.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.23.0",
+    "openai>=1.0.0",
+    "httpx>=0.27.0",
+]
+
+[project.scripts]
+server = "server.app:main"

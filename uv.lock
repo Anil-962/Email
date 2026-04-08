@@ -1,0 +1,2 @@
+# Placeholder lock file for OpenEnv local validation gate.
+# The official environment lock file remains at my_env/uv.lock.
