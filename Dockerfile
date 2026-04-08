@@ -4,20 +4,16 @@ WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV PORT=7860
 
-# Install only runtime deps required by the FastAPI backend used in Space.
-COPY my_env/server/requirements.space.txt /app/requirements.space.txt
-RUN pip install --no-cache-dir -r /app/requirements.space.txt
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r /app/requirements.txt \
+    && pip install --no-cache-dir sqlalchemy requests
 
-# Copy source.
-COPY my_env /app/my_env
-COPY openenv.yaml /app/openenv.yaml
-COPY __init__.py /app/__init__.py
-COPY client.py /app/client.py
-COPY models.py /app/models.py
-COPY server /app/server
+COPY . /app
 
-# Hugging Face Spaces expects the app on port 7860 (or PORT env var).
+# Hugging Face Spaces requirement.
 EXPOSE 7860
 
-CMD ["sh", "-c", "uvicorn server.app:app --host 0.0.0.0 --port ${PORT:-7860}"]
+CMD ["uvicorn", "server.main:app", "--host", "0.0.0.0", "--port", "7860"]
